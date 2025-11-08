@@ -6,25 +6,39 @@ ddb.sql('DESCRIBE pscp')
 
 ddb.sql('SELECT "Vendor Name", COUNT(DISTINCT "Procurement Identification Number") as cnt FROM pscp  WHERE "Contract Year" > 2019 GROUP BY "Vendor Name" ORDER BY cnt')
 
-# for each PIN, keep the max total cost
-ddb.sql(
+
+
+info = ddb.sql(
 """
-WITH cte AS
-( SELECT b."Vendor Name", a.Total_Value
-FROM
-(SELECT "Procurement Identification Number",
-       MAX("Total Contract Value") as Total_Value
+SELECT DISTINCT 
+"Procurement Identification Number" AS pin, 
+UPPER("Vendor Name") AS "vendor_name"--,
+--UPPER("Description of Work English") AS description,
+--UPPER("Standing Offer") AS standing_offer
+FROM pscp
+""")
+
+# for each PIN, keep the max total cost
+contracts = ddb.sql("""
+SELECT "Procurement Identification Number" as pin,
+       MAX("Total Contract Value") as total_value
 FROM pscp 
 WHERE "Contract Year" > 2019 
-GROUP BY "Procurement Identification Number") a
-LEFT JOIN 
-(SELECT DISTINCT "Procurement Identification Number", UPPER("Vendor Name") as "Vendor Name" from pscp) b
-ON a."Procurement Identification Number" = b."Procurement Identification Number" )
-SELECT "Vendor Name",
-SUM(Total_Value) as Sum_Total_Value 
+GROUP BY pin
+""")
+
+total_contracts = ddb.sql(
+"""
+WITH cte AS
+( SELECT b.vendor_name, a.total_value
+FROM contracts a
+LEFT JOIN info b
+ON a.pin = b.pin )
+SELECT vendor_name,
+SUM(total_value) as sum_total_value 
 FROM cte 
-GROUP BY "Vendor Name"
-ORDER BY Sum_Total_Value   
+GROUP BY vendor_name
+ORDER BY sum_total_value   
 """
 )
 
